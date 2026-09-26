@@ -27,9 +27,8 @@ namespace PCGExClusters
 	}
 
 	// "Mirror" constructor: creates a cluster that shares or copies structure from another.
-	// Used when multiple operations need independent cluster state (e.g. different edge validity)
-	// but share the same underlying point/edge data. When bCopyNodes/bCopyEdges are false,
-	// the arrays are shared (not duplicated), so structural reads are zero-cost.
+	// Used when multiple operations need independent cluster state (e.g. different edge validity).
+	// When bCopyNodes/bCopyEdges are false, the arrays are shared (not duplicated), so structural reads are zero-cost.
 	FCluster::FCluster(const TSharedRef<FCluster>& OtherCluster, const TSharedPtr<PCGExData::FPointIO>& InVtxIO, const TSharedPtr<PCGExData::FPointIO>& InEdgesIO, const TSharedPtr<PCGEx::FIndexLookup>& InNodeIndexLookup, const bool bCopyNodes, const bool bCopyEdges, const bool bCopyLookup)
 		: NodeIndexLookup(InNodeIndexLookup)
 		  , VtxIO(InVtxIO)
@@ -44,10 +43,6 @@ namespace PCGExClusters
 
 		NumRawVtx = InVtxIO->GetNum();
 		NumRawEdges = InEdgesIO->GetNum();
-
-		Bounds = OriginalCluster->Bounds;
-
-		BoundedEdges = OriginalCluster->BoundedEdges;
 
 		if (bCopyNodes)
 		{
@@ -98,7 +93,6 @@ namespace PCGExClusters
 				NewEdge.IOIndex = EdgeIOIndex;
 			}
 
-			BoundedEdges.Reset();
 			EdgesDataPtr = Edges->GetData();
 		}
 		else
@@ -106,6 +100,9 @@ namespace PCGExClusters
 			Edges = OriginalCluster->Edges;
 			EdgesDataPtr = OriginalCluster->EdgesDataPtr;
 		}
+
+		// Spatial state is never inherited: InVtxIO's points may have moved since the original was built.
+		ComputeBounds();
 	}
 
 	void FCluster::TConstVtxLookup::Dump(TArray<int32>& OutIndices) const
@@ -232,7 +229,7 @@ namespace PCGExClusters
 			}
 		}
 
-		Bounds = Bounds.ExpandBy(10);
+		Bounds = Bounds.ExpandBy(BoundsPadding);
 
 		NodesDataPtr = Nodes->GetData();
 		EdgesDataPtr = Edges->GetData();
@@ -266,7 +263,7 @@ namespace PCGExClusters
 		// Exact: every subgraph node is an endpoint of one of its edges.
 		check(Nodes->Num() == InNumNodes)
 
-		Bounds = Bounds.ExpandBy(10);
+		Bounds = Bounds.ExpandBy(BoundsPadding);
 
 		NodesDataPtr = Nodes->GetData();
 		EdgesDataPtr = Edges->GetData();
@@ -388,6 +385,29 @@ namespace PCGExClusters
 			});
 
 		Nodes->Shrink();
+	}
+
+	void FCluster::ComputeBounds()
+	{
+		Bounds = FBox(ForceInit);
+
+		const FNode* NodesData = NodesDataPtr;
+		FRWLock BoundsLock;
+		PCGExMT::ParallelOrSequentialScoped(
+			Nodes->Num(),
+			[&](const PCGExMT::FScope& Scope)
+			{
+				FBox ScopedBounds(ForceInit);
+				PCGEX_SCOPE_LOOP(i)
+				{
+					ScopedBounds += VtxTransforms[(NodesData + i)->PointIndex].GetLocation();
+				}
+
+				FWriteScopeLock WriteLock(BoundsLock);
+				Bounds += ScopedBounds;
+			}, ParallelClusterBuildThreshold);
+
+		Bounds = Bounds.ExpandBy(BoundsPadding);
 	}
 
 	bool FCluster::IsValidWith(const TSharedRef<PCGExData::FPointIO>& InVtxIO, const TSharedRef<PCGExData::FPointIO>& InEdgesIO) const
@@ -748,6 +768,22 @@ namespace PCGExClusters
 		ClosestIndex = FVector::DistSquared(Position, GetPos(Start)) < FVector::DistSquared(Position, GetPos(End)) ? Start->Index : End->Index;
 
 		return ClosestIndex;
+	}
+
+	bool FCluster::HasEdgeWithin(const FVector& Position, const double Radius)
+	{
+		// Negated compares on purpose: a NaN radius or distance must never pass.
+		if (!(Radius > 0))
+		{
+			return false;
+		}
+
+		const double RadiusSquared = FMath::Square(Radius);
+
+		// Box queries are exact (FindNearbyElements is not); an edge's octree bounds contain its segment.
+		return GetEdgeOctree()->FindFirstElementWithBoundsTest(
+			FBoxCenterAndExtent(Position, FVector(Radius)),
+			[&](const PCGExOctree::FItem& Item) { return !(GetPointDistToEdgeSquared(Item.Index, Position) < RadiusSquared); }).IsValidId();
 	}
 
 	int32 FCluster::FindClosestEdge(const int32 InNodeIndex, const FVector& InPosition, const int32 MinNeighbors) const

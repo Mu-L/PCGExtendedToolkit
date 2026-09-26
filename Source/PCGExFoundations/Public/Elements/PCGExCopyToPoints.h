@@ -14,8 +14,6 @@
 
 #include "PCGExCopyToPoints.generated.h"
 
-class FPCGExPointIOMerger;
-
 namespace PCGExMatching
 {
 	class FDataMatcher;
@@ -65,8 +63,12 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	bool bMergeCopies = false;
 
+	/** If enabled, copy target attributes as tags onto the outputs. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging & Forwarding", meta = (PCG_Overridable, InlineEditConditionToggle))
+	bool bCopyTargetsAttributesToTags = false;
+
 	/** Target attributes to copy as tags onto output points. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging & Forwarding")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging & Forwarding", meta = (EditCondition = "bCopyTargetsAttributesToTags"))
 	FPCGExAttributeToTagDetails TargetsAttributesToCopyTags;
 
 	/** Which target attributes to forward on copied points. */
@@ -87,9 +89,6 @@ struct FPCGExCopyToPointsContext final : FPCGExPointsProcessorContext
 
 	FPCGExAttributeToTagDetails TargetsAttributesToCopyTags;
 	TSharedPtr<PCGExData::FDataForwardHandler> TargetsForwardHandler;
-
-	// Merge mode: permissive carry-over, source @Data stays @Data (identical across copies)
-	FPCGExCarryOverDetails MergeCarryOver;
 
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL
@@ -116,9 +115,7 @@ namespace PCGExCopyToPoints
 		// Merge mode: per-target match flags (written by index in ProcessRange), compacted in CompleteWork
 		TArray<int8> MatchedTargets;
 		TArray<int32> MatchedIndices;
-		TSharedPtr<PCGExData::FFacade> MergedFacade;
-		TSharedPtr<FPCGExPointIOMerger> Merger;
-		FBox FitBounds = FBox(ForceInit);
+		TSharedPtr<PCGExData::FPointIO> MergedIO;
 
 	public:
 		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)
@@ -133,11 +130,10 @@ namespace PCGExCopyToPoints
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
 		virtual void ProcessRange(const PCGExMT::FScope& Scope) override;
 		virtual void CompleteWork() override;
-		virtual void Write() override;
 
 	protected:
 		void StartMerge();
-		void OnMergeComplete();
-		void TagMergedOutput(const TSharedPtr<PCGExData::FPointIO>& MergedIO) const;
+		void ReplicateMerged();
+		void TagMergedOutput(const TSharedPtr<PCGExData::FPointIO>& InMergedIO) const;
 	};
 }

@@ -8,10 +8,7 @@
 #include "PCGExDataForwardDetails.h"
 #include "Types/PCGExAttributeIdentity.h"
 
-namespace PCGExMT
-{
-	struct FScope;
-}
+class UPCGBasePointData;
 
 namespace PCGExData
 {
@@ -31,7 +28,7 @@ namespace PCGExData
 		TArray<FAttributeIdentity> Identities;
 		TArray<TSharedPtr<IBuffer>> Readers;
 		TArray<TSharedPtr<IBuffer>> Writers;
-		EForwardDomain Domain = EForwardDomain::ToData;
+		EForwardDomain Domain = EForwardDomain::Inherit;
 
 		/** Identifier the source attribute is written under on the target, per Domain. */
 		FPCGAttributeIdentifier GetTargetIdentifier(const FAttributeIdentity& Identity) const;
@@ -43,9 +40,9 @@ namespace PCGExData
 		using FValidateFn = std::function<bool(const FAttributeIdentity&)>;
 
 		~FDataForwardHandler() = default;
-		FDataForwardHandler(const FPCGExForwardDetails& InDetails, const TSharedPtr<FFacade>& InSourceDataFacade, const EForwardDomain InDomain = EForwardDomain::ToData);
+		FDataForwardHandler(const FPCGExForwardDetails& InDetails, const TSharedPtr<FFacade>& InSourceDataFacade, const EForwardDomain InDomain = EForwardDomain::Inherit);
 		// InIgnoredAttributes: source attribute names never forwarded, applied before the details name filter.
-		FDataForwardHandler(const FPCGExForwardDetails& InDetails, const TSharedPtr<FFacade>& InSourceDataFacade, const TSharedPtr<FFacade>& InTargetDataFacade, const EForwardDomain InDomain = EForwardDomain::ToData, const TSet<FName>* InIgnoredAttributes = nullptr);
+		FDataForwardHandler(const FPCGExForwardDetails& InDetails, const TSharedPtr<FFacade>& InSourceDataFacade, const TSharedPtr<FFacade>& InTargetDataFacade, const EForwardDomain InDomain = EForwardDomain::Inherit, const TSet<FName>* InIgnoredAttributes = nullptr);
 
 		void ValidateIdentities(FValidateFn&& Fn);
 
@@ -54,26 +51,19 @@ namespace PCGExData
 			return Identities.IsEmpty();
 		}
 
-		const TArray<FAttributeIdentity>& GetIdentities() const
-		{
-			return Identities;
-		}
-
 		void Forward(const int32 SourceIndex, const int32 TargetIndex);
 
 		// Prepared-target variant (requires the target-facade constructor): fans one source row out to many
 		// target indices through the pre-created writers -- no lazy buffer creation, safe from concurrent tasks.
 		void Forward(const int32 SourceIndex, const TArray<int32>& Indices);
 
-		// Prepared-target variant over a contiguous target range.
-		void Forward(const int32 SourceIndex, const PCGExMT::FScope& TargetScope);
-
 		void Forward(const int32 SourceIndex, const TSharedPtr<FFacade>& InTargetDataFacade);
-
-		// Fans one source row out to the given target indices. With EForwardDomain::ToElements a @Data source lands
-		// per element, so successive calls with disjoint index sets carry distinct values on one target data.
 		void Forward(const int32 SourceIndex, const TSharedPtr<FFacade>& InTargetDataFacade, const TArray<int32>& Indices);
 		void Forward(const int32 SourceIndex, UPCGMetadata* InTargetMetadata);
+
+		// Copy k owns Target points [k*Stride, (k+1)*Stride) and gets source row SourceIndices[k] per element, one value key
+		// per copy; ignores Domain and replaces same-named Elements attributes. Target's entries must already be its own.
+		void ForwardToCopies(TConstArrayView<int32> SourceIndices, UPCGBasePointData* Target, int32 Stride) const;
 
 		// Forwards source attributes onto a single entry (per-row, element domain) of any target metadata -- e.g. a source path's @Data onto one attribute-set row.
 		void Forward(const int32 SourceIndex, UPCGMetadata* InTargetMetadata, const int64 TargetKey);

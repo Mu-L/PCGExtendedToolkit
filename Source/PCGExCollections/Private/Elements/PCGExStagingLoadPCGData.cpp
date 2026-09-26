@@ -5,6 +5,7 @@
 
 #include "PCGDataAsset.h"
 #include "PCGParamData.h"
+#include "Clusters/PCGExClusterCommon.h"
 #include "Collections/PCGExPCGDataAssetCollection.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
@@ -21,7 +22,8 @@
 #include "Elements/PCGExStagingLoadProperties.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 #include "Helpers/PCGExRandomHelpers.h"
-#include "Utils/PCGExPointIOMerger.h"
+#include "Data/PCGPointArrayData.h"
+#include "Data/Utils/PCGExPointReplicate.h"
 
 #define LOCTEXT_NAMESPACE "PCGExPCGDataAssetLoaderElement"
 #define PCGEX_NAMESPACE PCGDataAssetLoader
@@ -176,33 +178,19 @@ namespace PCGExPCGDataAssetLoader
 		{
 		}
 
-		// Ranged: only InScope of InData. Ranged tasks share one data, so its ranges must be allocated before they start.
-		FTransformPoints(const FTransform& InTransform, UPCGBasePointData* InData, const PCGExMT::FScope& InScope)
-			: FTransformTask(InTransform)
-			  , Data(InData)
-			  , Scope(InScope)
-		{
-		}
-
 		UPCGBasePointData* Data = nullptr;
-		PCGExMT::FScope Scope;
 
 		virtual void ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override
 		{
-			// Ranged tasks share one pre-allocated data: an allocating getter would race on it
-			const bool bAllocate = !Scope.IsValid();
-			TPCGValueRange<FTransform> OutTransforms = Data->GetTransformValueRange(bAllocate);
+			TPCGValueRange<FTransform> OutTransforms = Data->GetTransformValueRange();
 
-			const int32 Start = Scope.IsValid() ? Scope.Start : 0;
-			const int32 Count = Scope.IsValid() ? Scope.Count : OutTransforms.Num();
-
-			PCGEX_PARALLEL_FOR(Count, OutTransforms[Start + i] *= Transform;)
+			PCGEX_PARALLEL_FOR(OutTransforms.Num(), OutTransforms[i] *= Transform;)
 
 			const auto* Settings = TaskManager->GetContext()->GetInputSettings<UPCGExPCGDataAssetLoaderSettings>();
 			if (Settings->bRefreshSeeds)
 			{
-				TPCGValueRange<int32> OutSeeds = Data->GetSeedValueRange(bAllocate);
-				PCGEX_PARALLEL_FOR(Count, OutSeeds[Start + i] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[Start + i].GetLocation());)
+				TPCGValueRange<int32> OutSeeds = Data->GetSeedValueRange(true);
+				PCGEX_PARALLEL_FOR(OutSeeds.Num(), OutSeeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[i].GetLocation());)
 			}
 		}
 	};
@@ -288,7 +276,28 @@ namespace PCGExPCGDataAssetLoader
 		}
 	};
 
-	FSpatialTransformResult PrepareTransformTask(UPCGSpatialData* InData, const FTransform& InTransform, const bool bOmitIfEmpty)
+	/** Emptiness rule behind bOmitEmptyData, checked on the original spatial data before any copy is made */
+	bool IsSpatialDataEmpty(const UPCGSpatialData* InData)
+	{
+		if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData))
+		{
+			return PointData->IsEmpty();
+		}
+
+		if (const UPCGSplineData* SplineData = Cast<UPCGSplineData>(InData))
+		{
+			return SplineData->GetNumSegments() == 0;
+		}
+
+		if (const UPCGPolyLineData* PolyLineData = Cast<UPCGPolyLineData>(InData))
+		{
+			return PolyLineData->GetNumSegments() == 0;
+		}
+
+		return false;
+	}
+
+	FSpatialTransformResult PrepareTransformTask(UPCGSpatialData* InData, const FTransform& InTransform)
 	{
 		if (!InData)
 		{
@@ -297,28 +306,16 @@ namespace PCGExPCGDataAssetLoader
 
 		if (UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData))
 		{
-			if (bOmitIfEmpty && PointData->IsEmpty())
-			{
-				return FSpatialTransformResult();
-			}
 			return FSpatialTransformResult(MakeShared<FTransformPoints>(InTransform, PointData));
 		}
 
 		if (UPCGSplineData* SplineData = Cast<UPCGSplineData>(InData))
 		{
-			if (bOmitIfEmpty && !SplineData->GetNumSegments())
-			{
-				return FSpatialTransformResult();
-			}
 			return FSpatialTransformResult(MakeShared<FTransformSpline>(InTransform, SplineData));
 		}
 
 		if (UPCGPolyLineData* PolyLineData = Cast<UPCGPolyLineData>(InData))
 		{
-			if (bOmitIfEmpty && !PolyLineData->GetNumSegments())
-			{
-				return FSpatialTransformResult();
-			}
 			return FSpatialTransformResult(MakeShared<FTransformPolyline>(InTransform, PolyLineData));
 		}
 
@@ -349,13 +346,8 @@ namespace PCGExPCGDataAssetLoader
 
 #pragma region FPCGExPCGDataAssetLoaderContext
 
-void FPCGExPCGDataAssetLoaderContext::RegisterOutput(const FPCGTaggedData& InTaggedData, bool bAddPinTag, const int32 InIndex)
+FPCGTaggedData FPCGExPCGDataAssetLoaderContext::ResolveOutput(const FPCGTaggedData& InTaggedData) const
 {
-	if (!InTaggedData.Data)
-	{
-		return;
-	}
-
 	FName TargetPin = PCGExPCGDataAssetLoader::OutputPinDefault;
 
 	// Check if we have a custom pin that matches
@@ -367,21 +359,30 @@ void FPCGExPCGDataAssetLoaderContext::RegisterOutput(const FPCGTaggedData& InTag
 	FPCGTaggedData LocalOutputData = InTaggedData;
 
 	// Only add Pin: tag for data going to default "Out" pin
-	if (bAddPinTag && TargetPin == PCGExPCGDataAssetLoader::OutputPinDefault && !InTaggedData.Pin.IsNone())
+	if (TargetPin == PCGExPCGDataAssetLoader::OutputPinDefault && !InTaggedData.Pin.IsNone())
 	{
 		LocalOutputData.Tags.Add(FString::Printf(TEXT("Pin:%s"), *InTaggedData.Pin.ToString()));
 	}
 
 	LocalOutputData.Pin = TargetPin;
-
-	{
-		FWriteScopeLock WriteLock(OutputLock);
-		OutputByPin.FindOrAdd(TargetPin).Add(LocalOutputData);
-		OutputIndices.Add(InTaggedData.Data->GetUniqueID(), InIndex);
-	}
+	return LocalOutputData;
 }
 
-void FPCGExPCGDataAssetLoaderContext::RegisterUniqueData(const FPCGTaggedData& InTaggedData, const int32 InIndex)
+void FPCGExPCGDataAssetLoaderContext::RegisterOutput(const FPCGTaggedData& InTaggedData, const PCGExPCGDataAssetLoader::FOutputOrder& InOrder)
+{
+	if (!InTaggedData.Data)
+	{
+		return;
+	}
+
+	FPCGTaggedData ResolvedData = ResolveOutput(InTaggedData);
+	const FName TargetPin = ResolvedData.Pin;
+
+	FWriteScopeLock WriteLock(OutputLock);
+	OutputByPin.FindOrAdd(TargetPin).Add({MoveTemp(ResolvedData), InOrder, true});
+}
+
+void FPCGExPCGDataAssetLoaderContext::RegisterUniqueData(const FPCGTaggedData& InTaggedData, const PCGExPCGDataAssetLoader::FOutputOrder& InOrder)
 {
 	if (!InTaggedData.Data)
 	{
@@ -392,24 +393,64 @@ void FPCGExPCGDataAssetLoaderContext::RegisterUniqueData(const FPCGTaggedData& I
 
 	{
 		FReadScopeLock ReadLock(UniqueDataLock);
-		if (UniqueDataUIDs.Contains(UID))
+		if (const PCGExPCGDataAssetLoader::FUniqueSlot* Slot = UniqueData.Find(UID);
+			Slot && !(InOrder < Slot->Order))
 		{
 			return;
 		}
 	}
 
+	FWriteScopeLock WriteLock(UniqueDataLock);
+
+	PCGExPCGDataAssetLoader::FUniqueSlot* Slot = UniqueData.Find(UID);
+	if (Slot && !(InOrder < Slot->Order))
 	{
-		FWriteScopeLock WriteLock(UniqueDataLock);
+		return;
+	}
 
-		bool bAlreadyInSet = false;
-		UniqueDataUIDs.Add(UID, &bAlreadyInSet);
-		if (bAlreadyInSet)
+	// Goes to appropriate pin, with Pin: tag if going to default
+	FPCGTaggedData ResolvedData = ResolveOutput(InTaggedData);
+	const FName TargetPin = ResolvedData.Pin;
+
+	FWriteScopeLock OutputWriteLock(OutputLock);
+
+	if (Slot)
+	{
+		// An earlier registrant in output order takes over the entry, tags included
+		Slot->Order = InOrder;
+		OutputByPin.FindChecked(Slot->Pin)[Slot->Index] = {MoveTemp(ResolvedData), InOrder, false};
+		return;
+	}
+
+	TArray<PCGExPCGDataAssetLoader::FOutputEntry>& PinOutputs = OutputByPin.FindOrAdd(TargetPin);
+	UniqueData.Add(UID, {InOrder, TargetPin, PinOutputs.Num()});
+	PinOutputs.Add({MoveTemp(ResolvedData), InOrder, false});
+}
+
+void FPCGExPCGDataAssetLoaderContext::StageRegisteredOutputs()
+{
+	int32 NumOutputs = 0;
+	for (const TPair<FName, TArray<PCGExPCGDataAssetLoader::FOutputEntry>>& Pair : OutputByPin)
+	{
+		NumOutputs += Pair.Value.Num();
+	}
+
+	IncreaseStagedOutputReserve(NumOutputs);
+
+	// Pin order is irrelevant downstream (each pin is gathered separately); the order within a pin is total
+	for (TPair<FName, TArray<PCGExPCGDataAssetLoader::FOutputEntry>>& Pair : OutputByPin)
+	{
+		Pair.Value.Sort([](const PCGExPCGDataAssetLoader::FOutputEntry& A, const PCGExPCGDataAssetLoader::FOutputEntry& B) { return A.Order < B.Order; });
+
+		for (const PCGExPCGDataAssetLoader::FOutputEntry& Entry : Pair.Value)
 		{
-			return;
-		}
+			// Asset-owned data is shared with the loaded asset: never mutated, never managed
+			const PCGExData::EStaging Staging =
+				(Entry.bOwned ? PCGExData::EStaging::MutableAndManaged : PCGExData::EStaging::None) |
+				(Entry.TaggedData.bPinlessData ? PCGExData::EStaging::Pinless : PCGExData::EStaging::None);
 
-		// Goes to appropriate pin, with Pin: tag if going to default
-		RegisterOutput(InTaggedData, true, InIndex);
+			StageOutput(const_cast<UPCGData*>(Entry.TaggedData.Data.Get()), Entry.TaggedData.Pin, Staging, Entry.TaggedData.Tags);
+		}
 	}
 }
 
@@ -479,7 +520,6 @@ bool FPCGExPCGDataAssetLoaderElement::Boot(FPCGExContext* InContext) const
 	}
 
 	Context->SharedAssetPool = MakeShared<FPCGExSharedAssetPool>();
-	Context->MergeCarryOver.Init();
 	Context->CustomPinNames.Reserve(Settings->CustomOutputPins.Num());
 
 	// Build custom pin name set for fast lookup
@@ -510,8 +550,6 @@ bool FPCGExPCGDataAssetLoaderElement::AdvanceWork(FPCGExContext* InContext, cons
 			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
-				// Merged outputs are facade-written; per-target duplicates are complete after CompleteWork.
-				NewBatch->bRequiresWriteStep = Settings->bMergePointOutputs;
 			}))
 		{
 			return Context->CancelExecution(TEXT("Could not find any points to process."));
@@ -520,14 +558,7 @@ bool FPCGExPCGDataAssetLoaderElement::AdvanceWork(FPCGExContext* InContext, cons
 
 	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
 
-	for (auto& Pair : Context->OutputByPin)
-	{
-		Pair.Value.Sort([&](const FPCGTaggedData& A, const FPCGTaggedData& B)
-		{
-			return Context->OutputIndices[A.Data->GetUniqueID()] < Context->OutputIndices[B.Data->GetUniqueID()];
-		});
-		Context->OutputData.TaggedData.Append(Pair.Value);
-	}
+	Context->StageRegisteredOutputs();
 
 	// Mark unused pins as inactive
 	int32 PinIndex = 0;
@@ -595,6 +626,14 @@ namespace PCGExPCGDataAssetLoader
 		if (Settings->TargetsForwarding.bEnabled)
 		{
 			ForwardHandler = Settings->TargetsForwarding.GetHandler(PointDataFacade);
+		}
+
+		if (Settings->bForwardInputTags)
+		{
+			// The input's own pairing tags would give every copy the same pair ID
+			const TSharedPtr<PCGExData::FTags> InputTags = MakeShared<PCGExData::FTags>(PointDataFacade->Source->Tags);
+			InputTags->Remove(PCGExClusters::Labels::ProtectedClusterTags);
+			InputTags->DumpTo(ForwardedInputTags);
 		}
 
 		// Initialize per-point hash storage
@@ -681,40 +720,149 @@ namespace PCGExPCGDataAssetLoader
 		return true;
 	}
 
-	FSpatialTransformResult FProcessor::ProcessTaggedData(int32 PointIndex, const FTransform& TargetTransform, const FPCGTaggedData& InTaggedData, FClusterIdRemapper& ClusterRemapper)
+	// PCGEx cluster pairing tag: PCGEx/Cluster:ID
+	const FString ClusterTagPrefix = TEXT("PCGEx/Cluster:");
+
+	// Embedded collection maps are merged into the Map output (FBatch::OnLoadAssetsComplete), never spawned
+	const FName EmbeddedCollectionMapPin = TEXT("CollectionMap");
+
+	int32 ParseClusterId(const FString& InClusterTag)
 	{
-		UPCGData* Data = const_cast<UPCGData*>(InTaggedData.Data.Get());
-		if (!Data)
+		return FCString::Atoi(*InClusterTag.Mid(ClusterTagPrefix.Len()));
+	}
+
+	ERoute FProcessor::RouteDatum(const FPCGTaggedData& InTaggedData) const
+	{
+		if (!InTaggedData.Data)
+		{
+			return ERoute::Skip;
+		}
+
+		if (Settings->bMergeEmbeddedCollectionMaps && InTaggedData.Pin == EmbeddedCollectionMapPin)
+		{
+			return ERoute::Skip;
+		}
+
+		if (!PassesTagFilter(InTaggedData))
+		{
+			return ERoute::Skip;
+		}
+
+		const UPCGSpatialData* SpatialData = Cast<UPCGSpatialData>(InTaggedData.Data);
+
+		if (bPassthrough)
+		{
+			if (Settings->bOmitEmptyData && SpatialData && IsSpatialDataEmpty(SpatialData))
+			{
+				return ERoute::Skip;
+			}
+
+			// Attribute forwarding needs writable metadata
+			return ForwardHandler ? ERoute::Copy : ERoute::Unique;
+		}
+
+		if (!SpatialData)
+		{
+			return ERoute::Unique;
+		}
+
+		if (Settings->bOmitEmptyData && IsSpatialDataEmpty(SpatialData))
+		{
+			return ERoute::Skip;
+		}
+
+		return ShouldMerge(InTaggedData) ? ERoute::Merge : ERoute::Copy;
+	}
+
+	UPCGDataAsset* FProcessor::GetTargetAsset(const int32 PointIndex) const
+	{
+		if (!PointFilterCache[PointIndex] || PointEntryHashes[PointIndex] == 0)
+		{
+			return nullptr;
+		}
+
+		return Context->SharedAssetPool->GetAsset(PointEntryHashes[PointIndex]);
+	}
+
+	int32 FProcessor::GetClusterIdDemand() const
+	{
+		// Routing depends on the datum alone, so every target of one asset consumes the same number of IDs.
+		// An ID reserved for a copy whose duplication fails is left unused.
+		TMap<const UPCGDataAsset*, int32> DemandPerAsset;
+		int32 Demand = 0;
+
+		for (int32 Index = 0; Index < PointEntryHashes.Num(); Index++)
+		{
+			const UPCGDataAsset* DataAsset = GetTargetAsset(Index);
+			if (!DataAsset)
+			{
+				continue;
+			}
+
+			if (const int32* KnownDemand = DemandPerAsset.Find(DataAsset))
+			{
+				Demand += *KnownDemand;
+				continue;
+			}
+
+			// One ID per distinct original ID among copied data, as FClusterIdRemapper assigns them
+			TSet<int32> OriginalIds;
+			for (const FPCGTaggedData& TaggedData : DataAsset->Data.GetAllInputs())
+			{
+				if (RouteDatum(TaggedData) != ERoute::Copy)
+				{
+					continue;
+				}
+
+				for (const FString& Tag : TaggedData.Tags)
+				{
+					if (Tag.StartsWith(ClusterTagPrefix))
+					{
+						OriginalIds.Add(ParseClusterId(Tag));
+					}
+				}
+			}
+
+			DemandPerAsset.Add(DataAsset, OriginalIds.Num());
+			Demand += OriginalIds.Num();
+		}
+
+		return Demand;
+	}
+
+	FSpatialTransformResult FProcessor::ProcessTaggedData(const int32 PointIndex, const int32 DatumIndex, const FTransform& TargetTransform, const FPCGTaggedData& InTaggedData, FClusterIdRemapper& ClusterRemapper)
+	{
+		const ERoute Route = RouteDatum(InTaggedData);
+		if (Route == ERoute::Skip)
 		{
 			return FSpatialTransformResult();
 		}
 
-		const int32 OutIdx = BatchIndex * 1000000 + PointIndex;
+		const FOutputOrder Order{1, BatchIndex, PointIndex, DatumIndex};
 
 		if (bPassthrough)
 		{
 			// Attribute-set input: no target transform, output loaded contents as-is
-			ProcessPassthroughData(PointIndex, OutIdx, InTaggedData, ClusterRemapper);
+			ProcessPassthroughData(PointIndex, Order, Route, InTaggedData, ClusterRemapper);
 			return FSpatialTransformResult();
 		}
 
-		UPCGSpatialData* SpatialData = Cast<UPCGSpatialData>(Data);
-
-		if (!SpatialData)
+		if (Route == ERoute::Unique)
 		{
 			// Non-spatial data: register once per unique asset (not per point), ordered before spatial data
-			Context->RegisterUniqueData(InTaggedData, OutIdx * -1);
+			Context->RegisterUniqueData(InTaggedData, FOutputOrder{0, BatchIndex, PointIndex, DatumIndex});
 			return FSpatialTransformResult();
 		}
 
-		if (ShouldMerge(InTaggedData))
+		if (Route == ERoute::Merge)
 		{
-			QueueMerge(PointIndex, OutIdx, InTaggedData);
+			QueueMerge(PointIndex, Order, InTaggedData);
 			return FSpatialTransformResult();
 		}
 
 		// Spatial data: duplicate and transform for this point
-		UPCGSpatialData* DuplicatedData = Context->ManagedObjects->DuplicateData<UPCGSpatialData>(SpatialData);
+		const UPCGData* Data = InTaggedData.Data.Get();
+		UPCGSpatialData* DuplicatedData = Context->ManagedObjects->DuplicateData<UPCGSpatialData>(Data);
 
 		if (!DuplicatedData)
 		{
@@ -726,7 +874,7 @@ namespace PCGExPCGDataAssetLoader
 		}
 
 		// Apply transform
-		FSpatialTransformResult TransformResult = PrepareTransformTask(DuplicatedData, TargetTransform, Settings->bOmitEmptyData);
+		FSpatialTransformResult TransformResult = PrepareTransformTask(DuplicatedData, TargetTransform);
 
 		if (TransformResult.Result == ETransformResult::Unsupported)
 		{
@@ -750,11 +898,7 @@ namespace PCGExPCGDataAssetLoader
 
 		// Remap PCGEx cluster tags if present (maintains Vtx/Edges pairing with new IDs)
 		RemapClusterTags(OutputData.Tags, ClusterRemapper);
-
-		if (Settings->bForwardInputTags)
-		{
-			PointDataFacade->Source->Tags->DumpTo(OutputData.Tags);
-		}
+		OutputData.Tags.Append(ForwardedInputTags);
 
 		// Forward attributes to point data if configured
 		if (ForwardHandler)
@@ -766,63 +910,24 @@ namespace PCGExPCGDataAssetLoader
 		}
 
 		// Register output (Pin: tag added only for default "Out" pin)
-		Context->RegisterOutput(OutputData, true, OutIdx);
+		Context->RegisterOutput(OutputData, Order);
 		return TransformResult;
 	}
 
-	/** Emptiness check on the original (un-duplicated) spatial data, mirroring PrepareTransformTask's bOmitIfEmpty rules */
-	bool IsSpatialDataEmpty(const UPCGSpatialData* InData)
+	void FProcessor::ProcessPassthroughData(const int32 PointIndex, const FOutputOrder& InOrder, const ERoute Route, const FPCGTaggedData& InTaggedData, FClusterIdRemapper& ClusterRemapper)
 	{
-		if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData))
-		{
-			return PointData->IsEmpty();
-		}
-
-		if (const UPCGSplineData* SplineData = Cast<UPCGSplineData>(InData))
-		{
-			return SplineData->GetNumSegments() == 0;
-		}
-
-		if (const UPCGPolyLineData* PolyLineData = Cast<UPCGPolyLineData>(InData))
-		{
-			return PolyLineData->GetNumSegments() == 0;
-		}
-
-		return false;
-	}
-
-	void FProcessor::ProcessPassthroughData(const int32 PointIndex, const int32 OutIdx, const FPCGTaggedData& InTaggedData, FClusterIdRemapper& ClusterRemapper)
-	{
-		const UPCGData* Data = InTaggedData.Data.Get();
-		if (!Data)
-		{
-			return;
-		}
-
-		if (Settings->bOmitEmptyData)
-		{
-			const UPCGSpatialData* SpatialData = Cast<UPCGSpatialData>(Data);
-			if (SpatialData && IsSpatialDataEmpty(SpatialData))
-			{
-				return;
-			}
-		}
-
 		FPCGTaggedData OutputData = InTaggedData;
 
-		if (Settings->bForwardInputTags)
-		{
-			PointDataFacade->Source->Tags->DumpTo(OutputData.Tags);
-		}
-
-		if (!ForwardHandler)
+		if (Route == ERoute::Unique)
 		{
 			// Raw: asset-owned data goes out untouched, once per unique data. Cluster IDs stay as saved.
-			Context->RegisterUniqueData(OutputData, OutIdx);
+			OutputData.Tags.Append(ForwardedInputTags);
+			Context->RegisterUniqueData(OutputData, InOrder);
 			return;
 		}
 
 		// Attribute forwarding needs writable metadata: duplicate (never transformed), one per row
+		const UPCGData* Data = InTaggedData.Data.Get();
 		UPCGData* DuplicatedData = Context->ManagedObjects->DuplicateData<UPCGData>(Data);
 		if (!DuplicatedData)
 		{
@@ -837,17 +942,15 @@ namespace PCGExPCGDataAssetLoader
 
 		// Per-row copies need distinct cluster IDs to keep Vtx/Edges pairs unambiguous
 		RemapClusterTags(OutputData.Tags, ClusterRemapper);
+		OutputData.Tags.Append(ForwardedInputTags);
 
 		if (UPCGMetadata* TargetMetadata = DuplicatedData->MutableMetadata())
 		{
 			ForwardHandler->Forward(PointIndex, TargetMetadata);
 		}
 
-		Context->RegisterOutput(OutputData, true, OutIdx);
+		Context->RegisterOutput(OutputData, InOrder);
 	}
-
-	// PCGEx cluster pairing tag: PCGEx/Cluster:ID
-	const FString ClusterTagPrefix = TEXT("PCGEx/Cluster:");
 
 	bool FProcessor::ShouldMerge(const FPCGTaggedData& InTaggedData) const
 	{
@@ -868,14 +971,8 @@ namespace PCGExPCGDataAssetLoader
 		return true;
 	}
 
-	void FProcessor::QueueMerge(const int32 PointIndex, const int32 OutIdx, const FPCGTaggedData& InTaggedData)
+	void FProcessor::QueueMerge(const int32 PointIndex, const FOutputOrder& InOrder, const FPCGTaggedData& InTaggedData)
 	{
-		const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InTaggedData.Data);
-		if (Settings->bOmitEmptyData && PointData->IsEmpty())
-		{
-			return;
-		}
-
 		// InTaggedData lives in the loaded asset's collection, so its address identifies the entry across targets
 		if (const int32* GroupIndex = MergeGroupByEntry.Find(&InTaggedData))
 		{
@@ -885,124 +982,60 @@ namespace PCGExPCGDataAssetLoader
 
 		TSharedPtr<FMergeGroup> Group = MakeShared<FMergeGroup>();
 		Group->Source = InTaggedData;
-		Group->OutIdx = OutIdx;
+		Group->Order = InOrder;
 		Group->TargetIndices.Add(PointIndex);
 		MergeGroupByEntry.Add(&InTaggedData, MergeGroups.Add(Group));
 	}
 
-	void FProcessor::StartMergeGroup(const TSharedPtr<FMergeGroup>& Group)
+	bool FProcessor::StartMergeGroup(const TSharedPtr<FMergeGroup>& Group)
 	{
 		const UPCGBasePointData* SourceData = Cast<UPCGBasePointData>(Group->Source.Data);
 
+		// Always point-array data: the replication writes contiguous native ranges.
 		Group->MergedIO = MakeShared<PCGExData::FPointIO>(PointDataFacade->Source->GetContextHandle(), SourceData);
 		Group->MergedIO->SetInfos(0, OutputPinDefault);
-		if (!Group->MergedIO->InitializeOutput(PCGExData::EIOInit::New))
+		if (!Group->MergedIO->InitializeOutput<UPCGPointArrayData>(PCGExData::EIOInit::New))
 		{
 			if (!Settings->bQuietUnsupportedTypeWarnings)
 			{
 				PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext, FText::Format(FTEXT("Failed to create merged output for point data of type {0}"), FText::FromString(SourceData->GetClass()->GetName())));
 			}
-			return;
+			return false;
 		}
 
-		// Registered now (the batch only collects outputs once every task and the write step are done), ordered by first target
+		// Registered now, ordered by first target; the batch only collects outputs once every task is done.
 		FPCGTaggedData OutputData;
 		OutputData.Data = Group->MergedIO->GetOut();
 		OutputData.Pin = Group->Source.Pin;
 		OutputData.Tags = Group->Source.Tags;
+		OutputData.Tags.Append(ForwardedInputTags);
 
-		if (Settings->bForwardInputTags)
-		{
-			PointDataFacade->Source->Tags->DumpTo(OutputData.Tags);
-		}
+		Context->RegisterOutput(OutputData, Group->Order);
 
-		Context->RegisterOutput(OutputData, true, Group->OutIdx);
-
-		const int32 NumSourcePoints = SourceData->GetNumPoints();
-		if (NumSourcePoints <= 0)
-		{
-			// One empty output stands in for the empty per-target duplicates
-			return;
-		}
-
-		// Forwarded target attributes replace same-named source ones, so the merger and the forward never share a name
-		TSet<FName> ForwardedNames;
-		if (ForwardHandler)
-		{
-			for (const PCGExData::FAttributeIdentity& Identity : ForwardHandler->GetIdentities())
-			{
-				ForwardedNames.Add(Identity.Name);
-				Group->MergedIO->DeleteAttribute(FPCGAttributeIdentifier(Identity.Name, PCGMetadataDomainID::Elements));
-			}
-		}
-
-		Group->MergedFacade = MakeShared<PCGExData::FFacade>(Group->MergedIO.ToSharedRef());
-		Group->Merger = MakeShared<FPCGExPointIOMerger>(Group->MergedFacade.ToSharedRef());
-
-		const PCGExMT::FScope ReadScope(0, NumSourcePoints);
-		for (int32 k = 0; k < Group->TargetIndices.Num(); k++)
-		{
-			Group->Merger->Append(Group->MergedIO, ReadScope, PCGExMT::FScope(k * NumSourcePoints, NumSourcePoints));
-		}
-
-		// Weak: the group owns the merger that stores this callback
-		Group->Merger->MergeAsync(
-			TaskManager, &Context->MergeCarryOver, &ForwardedNames, false, nullptr,
-			[PCGEX_ASYNC_THIS_CAPTURE, WeakGroup = TWeakPtr<FMergeGroup>(Group)]()
-			{
-				PCGEX_ASYNC_THIS
-				if (const TSharedPtr<FMergeGroup> PinnedGroup = WeakGroup.Pin())
-				{
-					This->OnMergeGroupComplete(PinnedGroup);
-				}
-			});
+		// bOmitEmptyData off: one empty output stands in for the empty per-target duplicates.
+		return SourceData->GetNumPoints() > 0;
 	}
 
-	void FProcessor::OnMergeGroupComplete(const TSharedPtr<FMergeGroup>& Group)
+	void FProcessor::ReplicateGroup(const FMergeGroup& Group) const
 	{
-		// Runs once every copy is merged: buffers are sized, so per-element writers and native ranges can be created once here
-		UPCGBasePointData* MergedOut = Group->MergedFacade->GetOut();
-		const int32 NumSourcePoints = Group->MergedIO->GetNum();
-
-		EPCGPointNativeProperties Allocations = EPCGPointNativeProperties::Transform;
-		if (Settings->bRefreshSeeds)
-		{
-			EnumAddFlags(Allocations, EPCGPointNativeProperties::Seed);
-		}
-		MergedOut->AllocateProperties(Allocations);
-
-		const TSharedPtr<PCGExData::FDataForwardHandler> MergedForwardHandler = Settings->TargetsForwarding.TryGetHandler(PointDataFacade, Group->MergedFacade, PCGExData::EForwardDomain::ToElements);
 		const TConstPCGValueRange<FTransform> InTransforms = PointDataFacade->GetIn()->GetConstTransformValueRange();
 
-		TArray<TSharedPtr<PCGExMT::FTask>> Tasks;
-		Tasks.Reserve(Group->TargetIndices.Num());
-
-		for (int32 k = 0; k < Group->TargetIndices.Num(); k++)
+		TArray<FTransform> CopyTransforms;
+		CopyTransforms.SetNumUninitialized(Group.TargetIndices.Num());
+		for (int32 k = 0; k < Group.TargetIndices.Num(); k++)
 		{
-			const int32 TargetIndex = Group->TargetIndices[k];
-			const PCGExMT::FScope WriteScope(k * NumSourcePoints, NumSourcePoints);
-
-			if (MergedForwardHandler)
-			{
-				MergedForwardHandler->Forward(TargetIndex, WriteScope);
-			}
-
-			Tasks.Add(MakeShared<FTransformPoints>(InTransforms[TargetIndex], MergedOut, WriteScope));
+			CopyTransforms[k] = InTransforms[Group.TargetIndices[k]];
 		}
 
-		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, MergedTransformTasks)
-		MergedTransformTasks->StartTasksBatch(Tasks);
-	}
+		PCGExPointReplicate::FCopies Copies;
+		Copies.Transforms = CopyTransforms;
+		Copies.bRefreshSeeds = Settings->bRefreshSeeds;
 
-	void FProcessor::Write()
-	{
-		for (const TSharedPtr<FMergeGroup>& Group : MergeGroups)
-		{
-			if (Group->MergedFacade)
-			{
-				Group->MergedFacade->WriteFastest(TaskManager);
-			}
-		}
+		PCGExPointReplicate::FForward Forward;
+		Forward.Handler = ForwardHandler.Get();
+		Forward.SourceIndices = Group.TargetIndices;
+
+		PCGExPointReplicate::Replicate(Cast<UPCGBasePointData>(Group.Source.Data), Group.MergedIO->GetOut(), Copies, &Forward);
 	}
 
 	void FProcessor::RemapClusterTags(TSet<FString>& Tags, FClusterIdRemapper& ClusterRemapper) const
@@ -1014,12 +1047,8 @@ namespace PCGExPCGDataAssetLoader
 		{
 			if (Tag.StartsWith(ClusterTagPrefix))
 			{
-				// Extract the original ID
-				FString IdString = Tag.Mid(ClusterTagPrefix.Len());
-				int32 OriginalId = FCString::Atoi(*IdString);
-
 				// Get the remapped ID (consistent within this point's data)
-				int32 NewId = ClusterRemapper.GetRemappedId(OriginalId);
+				const int32 NewId = ClusterRemapper.GetRemappedId(ParseClusterId(Tag));
 
 				// Queue for replacement
 				TagsToRemove.Add(Tag);
@@ -1051,18 +1080,7 @@ namespace PCGExPCGDataAssetLoader
 
 		for (int32 Index = 0; Index < NumPoints; Index++)
 		{
-			if (!PointFilterCache[Index])
-			{
-				continue;
-			}
-
-			const uint64 EntryHash = PointEntryHashes[Index];
-			if (EntryHash == 0)
-			{
-				continue;
-			}
-
-			UPCGDataAsset* DataAsset = Context->SharedAssetPool->GetAsset(EntryHash);
+			const UPCGDataAsset* DataAsset = GetTargetAsset(Index);
 			if (!DataAsset)
 			{
 				continue;
@@ -1074,21 +1092,11 @@ namespace PCGExPCGDataAssetLoader
 			// shares the same remapper so Vtx/Edges pairs maintain their relationship
 			FClusterIdRemapper ClusterRemapper(ClusterIdCounter);
 
-			for (const FPCGTaggedData& TaggedData : DataAsset->Data.GetAllInputs())
+			const TArray<FPCGTaggedData>& AssetData = DataAsset->Data.GetAllInputs();
+			for (int32 DatumIndex = 0; DatumIndex < AssetData.Num(); DatumIndex++)
 			{
-				// Strip embedded CollectionMap entries (consumed by merge in FBatch::OnLoadAssetsComplete)
-				if (Settings->bMergeEmbeddedCollectionMaps && TaggedData.Pin == FName(TEXT("CollectionMap")))
-				{
-					continue;
-				}
-
-				if (!PassesTagFilter(TaggedData))
-				{
-					continue;
-				}
-
 				// Process the data (cluster remapper ensures paired data gets consistent new IDs)
-				FSpatialTransformResult Result = ProcessTaggedData(Index, TargetTransform, TaggedData, ClusterRemapper);
+				FSpatialTransformResult Result = ProcessTaggedData(Index, DatumIndex, TargetTransform, AssetData[DatumIndex], ClusterRemapper);
 				if (Result.Task)
 				{
 					Tasks.Add(Result.Task);
@@ -1096,15 +1104,35 @@ namespace PCGExPCGDataAssetLoader
 			}
 		}
 
-		for (const TSharedPtr<FMergeGroup>& Group : MergeGroups)
-		{
-			StartMergeGroup(Group);
-		}
-
 		if (!Tasks.IsEmpty())
 		{
 			PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, TransformTasks)
 			TransformTasks->StartTasksBatch(Tasks);
+		}
+
+		TArray<int32> GroupsToReplicate;
+		for (int32 GroupIndex = 0; GroupIndex < MergeGroups.Num(); GroupIndex++)
+		{
+			if (StartMergeGroup(MergeGroups[GroupIndex]))
+			{
+				GroupsToReplicate.Add(GroupIndex);
+			}
+		}
+
+		if (!GroupsToReplicate.IsEmpty())
+		{
+			// One task per merged output: CompleteWork can run on the game thread (asset-load callback).
+			PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, ReplicateTasks)
+			for (const int32 GroupIndex : GroupsToReplicate)
+			{
+				ReplicateTasks->AddSimpleCallback(
+					[PCGEX_ASYNC_THIS_CAPTURE, GroupIndex]()
+					{
+						PCGEX_ASYNC_THIS
+						This->ReplicateGroup(*This->MergeGroups[GroupIndex]);
+					});
+			}
+			ReplicateTasks->StartSimpleCallbacks();
 		}
 	}
 
@@ -1150,18 +1178,29 @@ namespace PCGExPCGDataAssetLoader
 				Context->MergedMapPacker = MakeShared<PCGExCollections::FPickPacker>();
 				PCGExCollections::FPickUnpacker TempUnpacker;
 
-				// Scan all loaded data assets for embedded CollectionMap entries
+				// Asset path order, not pool order (filled by parallel point processing): a GUID collision keeps
+				// the first mapping unpacked, and the merged map's rows follow unpack order.
+				TSet<UPCGDataAsset*> UniqueAssets;
 				for (const auto& Pair : Context->SharedAssetPool->GetEntryMap())
 				{
-					UPCGDataAsset* Asset = Context->SharedAssetPool->GetAsset(Pair.Key);
-					if (!Asset)
+					if (UPCGDataAsset* Asset = Context->SharedAssetPool->GetAsset(Pair.Key))
 					{
-						continue;
+						UniqueAssets.Add(Asset);
 					}
+				}
 
+				TArray<UPCGDataAsset*> Assets = UniqueAssets.Array();
+				Assets.Sort([](const UPCGDataAsset& A, const UPCGDataAsset& B)
+				{
+					return A.GetPathName().Compare(B.GetPathName(), ESearchCase::CaseSensitive) < 0;
+				});
+
+				// Scan all loaded data assets for embedded CollectionMap entries
+				for (const UPCGDataAsset* Asset : Assets)
+				{
 					for (const FPCGTaggedData& TD : Asset->Data.TaggedData)
 					{
-						if (TD.Pin != FName(TEXT("CollectionMap")))
+						if (TD.Pin != EmbeddedCollectionMapPin)
 						{
 							continue;
 						}
@@ -1177,21 +1216,12 @@ namespace PCGExPCGDataAssetLoader
 					}
 				}
 
-				// Re-pack merged map: iterate unpacker's collection map and register each
-				// collection through the packer to produce a merged output
+				// Re-pack merged map: the union of every unpacked collection, registered in unpack order
 				if (TempUnpacker.HasValidMapping())
 				{
 					UPCGParamData* MergedMapData = Context->ManagedObjects->New<UPCGParamData>();
 
-					// The unpacker's CollectionMap has (GUID → Collection*) pairs.
-					// We need to produce the same format that PackToDataset writes.
-					// Since GUIDs are deterministic and globally unique, the union is trivial:
-					// just feed each collection through the packer once.
-					for (const auto& MapPair : TempUnpacker.GetCollections())
-					{
-						Context->MergedMapPacker->RegisterCollection(MapPair.Value);
-					}
-
+					TempUnpacker.RegisterCollectionsTo(*Context->MergedMapPacker);
 					Context->MergedMapPacker->PackToDataset(MergedMapData);
 
 					FPCGTaggedData MapOutput;
@@ -1201,11 +1231,37 @@ namespace PCGExPCGDataAssetLoader
 				}
 			}
 
+			ReserveClusterIds();
+
 			// Assets loaded, now complete work on all processors
 			TBatch<FProcessor>::CompleteWork();
 		}
 
 		PCGEX_ASYNC_RELEASE_TOKEN(LoadingToken)
+	}
+
+	void FBatch::ReserveClusterIds()
+	{
+		TArray<int32> Demand;
+		Demand.Init(0, Processors.Num());
+
+		PCGExMT::ParallelOrSequential(
+			Processors.Num(),
+			[&](const int32 i)
+			{
+				if (Processors[i]->bIsProcessorValid)
+				{
+					Demand[i] = GetProcessorRef<FProcessor>(i)->GetClusterIdDemand();
+				}
+			}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
+
+		// Serial and in input order: the bases never depend on which processor completes first
+		int32 Base = 0;
+		for (int32 i = 0; i < Processors.Num(); i++)
+		{
+			GetProcessorRef<FProcessor>(i)->ClusterIdCounter = Base;
+			Base += Demand[i];
+		}
 	}
 }
 

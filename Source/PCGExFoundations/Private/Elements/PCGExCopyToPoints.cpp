@@ -10,7 +10,9 @@
 #include "Fitting/PCGExFittingTasks.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Helpers/PCGExMatchingHelpers.h"
-#include "Utils/PCGExPointIOMerger.h"
+#include "Data/PCGPointArrayData.h"
+#include "Data/Utils/PCGExPointReplicate.h"
+#include "Fitting/PCGExFittingCommon.h"
 
 #define LOCTEXT_NAMESPACE "PCGExCopyToPointsElement"
 #define PCGEX_NAMESPACE CopyToPoints
@@ -75,10 +77,13 @@ bool FPCGExCopyToPointsElement::Boot(FPCGExContext* InContext) const
 		return false;
 	}
 
-	PCGEX_FWD(TargetsAttributesToCopyTags)
-	if (!Context->TargetsAttributesToCopyTags.Init(Context, Context->TargetsDataFacade))
+	if (Settings->bCopyTargetsAttributesToTags)
 	{
-		return false;
+		PCGEX_FWD(TargetsAttributesToCopyTags)
+		if (!Context->TargetsAttributesToCopyTags.Init(Context, Context->TargetsDataFacade))
+		{
+			return false;
+		}
 	}
 
 	Context->DataMatcher = MakeShared<PCGExMatching::FDataMatcher>();
@@ -90,8 +95,6 @@ bool FPCGExCopyToPointsElement::Boot(FPCGExContext* InContext) const
 
 
 	Context->TargetsForwardHandler = Settings->TargetsForwarding.GetHandler(Context->TargetsDataFacade);
-
-	Context->MergeCarryOver.Init();
 
 	return true;
 }
@@ -112,8 +115,6 @@ bool FPCGExCopyToPointsElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
-				// Merged outputs are facade-written; per-target duplicates are complete after CompleteWork.
-				NewBatch->bRequiresWriteStep = Settings->bMergeCopies;
 			}))
 		{
 			return Context->CancelExecution(TEXT("Could not find any points to process."));
@@ -162,6 +163,7 @@ namespace PCGExCopyToPoints
 		int32 Copies = 0;
 		FPCGExTaggedData AsCandidate = PointDataFacade->Source->GetTaggedData();
 		const bool bMerge = Settings->bMergeCopies;
+		const bool bTagCopies = Settings->bCopyTargetsAttributesToTags;
 
 		PCGEX_SCOPE_LOOP(i)
 		{
@@ -191,7 +193,10 @@ namespace PCGExCopyToPoints
 
 			Copies++;
 			Context->TargetsForwardHandler->Forward(i, Dupe->GetOut()->Metadata);
-			Context->TargetsAttributesToCopyTags.Tag(Context->TargetsDataFacade->GetInPoint(i), Dupe);
+			if (bTagCopies)
+			{
+				Context->TargetsAttributesToCopyTags.Tag(Context->TargetsDataFacade->GetInPoint(i), Dupe);
+			}
 
 			Dupes[i] = Dupe;
 
@@ -229,91 +234,61 @@ namespace PCGExCopyToPoints
 			}
 		}
 
-		const TSharedPtr<PCGExData::FPointIO> MergedIO = Context->MainPoints->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::New);
+		MergedIO = Context->MainPoints->Emplace_GetRef<UPCGPointArrayData>(PointDataFacade->Source, PCGExData::EIOInit::New);
 		if (!MergedIO)
 		{
 			return;
 		}
 
-		const int32 NumSourcePoints = PointDataFacade->GetNum();
-		if (NumSourcePoints <= 0)
-		{
-			// Nothing to replicate: the single empty output stands in for the empty per-target duplicates
-			TagMergedOutput(MergedIO);
-			return;
-		}
-
-		// Forwarded target attributes replace same-named source ones, so the merger and the forward never share a name
-		TSet<FName> ForwardedNames;
-		for (const PCGExData::FAttributeIdentity& Identity : Context->TargetsForwardHandler->GetIdentities())
-		{
-			ForwardedNames.Add(Identity.Name);
-			MergedIO->DeleteAttribute(FPCGAttributeIdentifier(Identity.Name, PCGMetadataDomainID::Elements));
-		}
-
-		MergedFacade = MakeShared<PCGExData::FFacade>(MergedIO.ToSharedRef());
-		FitBounds = PCGExFitting::Tasks::ComputeFitBounds(PointDataFacade->GetIn(), Context->TransformDetails.bIgnoreBounds);
-
-		Merger = MakeShared<FPCGExPointIOMerger>(MergedFacade.ToSharedRef());
-		const PCGExMT::FScope ReadScope(0, NumSourcePoints);
-		for (int32 k = 0; k < MatchedIndices.Num(); k++)
-		{
-			Merger->Append(PointDataFacade->Source, ReadScope, PCGExMT::FScope(k * NumSourcePoints, NumSourcePoints));
-		}
-
-		Merger->MergeAsync(
-			TaskManager, &Context->MergeCarryOver, &ForwardedNames, false, nullptr,
+		// CompleteWork can run on the calling thread of the batch; the replication itself always runs in a task.
+		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, ReplicateTask)
+		ReplicateTask->AddSimpleCallback(
 			[PCGEX_ASYNC_THIS_CAPTURE]()
 			{
 				PCGEX_ASYNC_THIS
-				This->OnMergeComplete();
+				This->ReplicateMerged();
 			});
+		ReplicateTask->StartSimpleCallbacks();
 	}
 
-	void FProcessor::OnMergeComplete()
+	void FProcessor::ReplicateMerged()
 	{
-		// Runs once every copy is merged: buffers are sized, so per-element writers and native ranges can be created once here
-		const int32 NumSourcePoints = PointDataFacade->GetNum();
+		// Every copy fits the same untransformed source, so the fit bounds are computed once.
+		const FBox FitBounds = PCGExFitting::Tasks::ComputeFitBounds(PointDataFacade->GetIn(), Context->TransformDetails.bIgnoreBounds).ExpandBy(0.1);
 
-		// After the merger's own source tag appends, so target tags win as they do on per-target copies
-		TagMergedOutput(MergedFacade->Source);
+		TArray<FTransform> CopyTransforms;
+		CopyTransforms.SetNum(MatchedIndices.Num());
+		PCGEX_PARALLEL_FOR(
+			MatchedIndices.Num(),
+			FBox CopyBounds = FitBounds; // ComputeTransform rewrites the bounds it is given
+			FVector Translation = FVector::ZeroVector;
+			Context->TransformDetails.ComputeTransform(MatchedIndices[i], CopyTransforms[i], CopyBounds, Translation);
+			)
 
-		MergedFacade->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform);
-		const TSharedPtr<PCGExData::FDataForwardHandler> ForwardHandler = Settings->TargetsForwarding.TryGetHandler(Context->TargetsDataFacade, MergedFacade, PCGExData::EForwardDomain::ToElements);
+		PCGExPointReplicate::FCopies Copies;
+		Copies.Transforms = CopyTransforms;
+		Copies.InheritStrategy = PCGExFitting::GetInheritStrategy(Context->TransformDetails.bInheritRotation, Context->TransformDetails.bInheritScale);
 
-		TArray<TSharedPtr<PCGExMT::FTask>> Tasks;
-		Tasks.Reserve(MatchedIndices.Num());
+		PCGExPointReplicate::FForward Forward;
+		Forward.Handler = Context->TargetsForwardHandler.Get();
+		Forward.SourceIndices = MatchedIndices;
 
-		for (int32 k = 0; k < MatchedIndices.Num(); k++)
+		PCGExPointReplicate::Replicate(PointDataFacade->GetIn(), MergedIO->GetOut(), Copies, &Forward);
+
+		// After replication, so target tags win over same-key source tags as they do on per-target copies.
+		TagMergedOutput(MergedIO);
+	}
+
+	void FProcessor::TagMergedOutput(const TSharedPtr<PCGExData::FPointIO>& InMergedIO) const
+	{
+		if (!Settings->bCopyTargetsAttributesToTags)
 		{
-			const int32 TargetIndex = MatchedIndices[k];
-			const PCGExMT::FScope WriteScope(k * NumSourcePoints, NumSourcePoints);
-
-			if (ForwardHandler)
-			{
-				ForwardHandler->Forward(TargetIndex, WriteScope);
-			}
-
-			Tasks.Add(MakeShared<PCGExFitting::Tasks::FTransformPointIO>(TargetIndex, Context->TargetsDataFacade->Source, MergedFacade->Source, &Context->TransformDetails, WriteScope, FitBounds));
+			return;
 		}
 
-		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, MergedTransformTasks)
-		MergedTransformTasks->StartTasksBatch(Tasks);
-	}
-
-	void FProcessor::TagMergedOutput(const TSharedPtr<PCGExData::FPointIO>& MergedIO) const
-	{
 		for (const int32 TargetIndex : MatchedIndices)
 		{
-			Context->TargetsAttributesToCopyTags.Tag(Context->TargetsDataFacade->GetInPoint(TargetIndex), MergedIO);
-		}
-	}
-
-	void FProcessor::Write()
-	{
-		if (MergedFacade)
-		{
-			MergedFacade->WriteFastest(TaskManager);
+			Context->TargetsAttributesToCopyTags.Tag(Context->TargetsDataFacade->GetInPoint(TargetIndex), InMergedIO);
 		}
 	}
 }
