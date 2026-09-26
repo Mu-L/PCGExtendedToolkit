@@ -127,7 +127,7 @@ namespace PCGExMath::Contrast
 			bIdentity = FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER);
 			InvContrast = Contrast > SMALL_NUMBER ? 1.0 / Contrast : 1.0;
 			const double TanhC = FMath::Tanh(Contrast);
-			InvTanhC = FMath::Abs(TanhC) > SMALL_NUMBER ? 1.0 / TanhC : 0.0;
+			InvTanhC = FMath::Abs(TanhC) < SMALL_NUMBER ? 0.0 : 1.0 / TanhC;
 		}
 
 		FORCEINLINE double Apply(const double Value) const
