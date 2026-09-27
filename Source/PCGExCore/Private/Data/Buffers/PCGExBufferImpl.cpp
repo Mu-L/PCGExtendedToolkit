@@ -428,7 +428,11 @@ namespace PCGExData
 
 		if (Init == EBufferInit::Inherit)
 		{
-			GrabExistingValues();
+			// A just-created, unparented attribute holds only the default that OutValues was already filled with.
+			if (!this->bIsNewOutput || CreatedAttribute->GetParent())
+			{
+				GrabExistingValues();
+			}
 		}
 		else if (!bHasIn && ExistingEntryCount != 0)
 		{

@@ -59,6 +59,8 @@ struct PCGEXCORE_API FPCGExForwardDetails : public FPCGExNameFiltersDetails
 	TSharedPtr<PCGExData::FDataForwardHandler> GetHandler(const TSharedPtr<PCGExData::FFacade>& InSourceDataFacade, const TSharedPtr<PCGExData::FFacade>& InTargetDataFacade, PCGExData::EForwardDomain InDomain = PCGExData::EForwardDomain::Inherit, const TSet<FName>* InIgnoredAttributes = nullptr) const;
 	TSharedPtr<PCGExData::FDataForwardHandler> TryGetHandler(const TSharedPtr<PCGExData::FFacade>& InSourceDataFacade, PCGExData::EForwardDomain InDomain = PCGExData::EForwardDomain::ToData) const;
 	TSharedPtr<PCGExData::FDataForwardHandler> TryGetHandler(const TSharedPtr<PCGExData::FFacade>& InSourceDataFacade, const TSharedPtr<PCGExData::FFacade>& InTargetDataFacade, PCGExData::EForwardDomain InDomain = PCGExData::EForwardDomain::Inherit, const TSet<FName>* InIgnoredAttributes = nullptr) const;
+	// Metadata-sourced handler (see FDataForwardHandler); null when forwarding is disabled.
+	TSharedPtr<PCGExData::FDataForwardHandler> TryGetHandler(const UPCGMetadata* InSourceMetadata, const TSharedPtr<PCGExData::FFacade>& InTargetDataFacade, const TSet<FName>* InIgnoredAttributes = nullptr) const;
 };
 
 USTRUCT(BlueprintType, meta=(PCGExNodeLibraryDoc="common-settings/data-utils/attribute-to-tag-details"))

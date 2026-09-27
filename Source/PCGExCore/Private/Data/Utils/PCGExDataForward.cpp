@@ -125,6 +125,49 @@ namespace PCGExData
 		}
 	}
 
+	FDataForwardHandler::FDataForwardHandler(const FPCGExForwardDetails& InDetails, const UPCGMetadata* InSourceMetadata, const TSharedPtr<FFacade>& InTargetDataFacade, const TSet<FName>* InIgnoredAttributes)
+		: Details(InDetails)
+		  , SourceDataFacade(nullptr)
+		  , TargetDataFacade(InTargetDataFacade)
+		  , Domain(EForwardDomain::Inherit)
+	{
+		Details.Init();
+		FAttributeIdentity::Get(InSourceMetadata, Identities, InIgnoredAttributes);
+		Details.Filter(Identities);
+
+		// ForwardEntry reads the source attribute by entry key, which only the Elements domain has.
+		for (int i = Identities.Num() - 1; i >= 0; i--)
+		{
+			if (Identities[i].InDataDomain() || !Identities[i].Attribute)
+			{
+				Identities.RemoveAt(i);
+			}
+		}
+
+		const int32 NumAttributes = Identities.Num();
+
+		// Writers stay index-aligned with Identities (null on failure); no Readers on a metadata-sourced handler.
+		Writers.Init(nullptr, NumAttributes);
+
+		for (int i = 0; i < NumAttributes; i++)
+		{
+			const FAttributeIdentity& Identity = Identities[i];
+
+			PCGExMetaHelpers::ExecuteWithRightType(
+				Identity,
+				[&](auto DummyValue)
+				{
+					using T = decltype(DummyValue);
+					Writers[i] = TargetDataFacade->GetWritable<T>(Identity.Attribute, EBufferInit::Inherit);
+				},
+				[&]()
+				{
+					// No entry-key read path for extended/container values outside a facade.
+					UE_LOG(LogPCGEx, Warning, TEXT("Attribute '%s' is a container or extended type and cannot be forwarded from sampled metadata -- skipped."), *Identity.Name.ToString());
+				});
+		}
+	}
+
 	void FDataForwardHandler::ValidateIdentities(FValidateFn&& Fn)
 	{
 		// Readers/Writers exist only on prepared (two-facade) handlers and must stay index-aligned with Identities.
@@ -192,6 +235,114 @@ namespace PCGExData
 		}
 	}
 
+	void FDataForwardHandler::ForwardEntry(const PCGMetadataEntryKey SourceKey, const int32 TargetIndex)
+	{
+		if (SourceKey == PCGInvalidEntryKey)
+		{
+			return;
+		}
+
+		const int32 NumAttributes = Identities.Num();
+
+		for (int i = 0; i < NumAttributes; i++)
+		{
+			if (!Writers.IsValidIndex(i) || !Writers[i])
+			{
+				continue;
+			}
+
+			const FAttributeIdentity& Identity = Identities[i];
+
+			PCGExMetaHelpers::ExecuteWithRightType(
+				Identity,
+				[&](auto DummyValue)
+				{
+					using T = decltype(DummyValue);
+					// Reads through the child attribute: an inherited entry resolves to the parent's value.
+					StaticCastSharedPtr<TBuffer<T>>(Writers[i])->SetValue(TargetIndex, Identity.Attribute->GetValueFromItemKey<T>(SourceKey));
+				});
+		}
+	}
+
+	void FDataForwardHandler::ForwardEntries(TConstArrayView<PCGMetadataEntryKey> SourceKeys)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(FDataForwardHandler::ForwardEntries);
+		ForwardEntriesScoped(PCGExMT::FScope(0, SourceKeys.Num()), SourceKeys);
+	}
+
+	void FDataForwardHandler::ForwardEntriesScoped(const PCGExMT::FScope& Scope, const TConstArrayView<PCGMetadataEntryKey> SourceKeyPerTarget) const
+	{
+		check(SourceKeyPerTarget.Num() >= Scope.End)
+
+		if (Identities.IsEmpty())
+		{
+			return;
+		}
+
+		// Compacted once per scope: every attribute resolves the same key set.
+		TArray<int32> TargetIndices;
+		TArray<PCGMetadataEntryKey> ValidKeys;
+		TargetIndices.Reserve(Scope.Count);
+		ValidKeys.Reserve(Scope.Count);
+
+		for (int32 t = Scope.Start; t < Scope.End; t++)
+		{
+			const PCGMetadataEntryKey Key = SourceKeyPerTarget[t];
+			if (Key != PCGInvalidEntryKey)
+			{
+				TargetIndices.Add(t);
+				ValidKeys.Add(Key);
+			}
+		}
+
+		if (ValidKeys.IsEmpty())
+		{
+			return;
+		}
+
+		const int32 NumAttributes = Identities.Num();
+		TArray<PCGMetadataValueKey> ValueKeys;
+
+		for (int i = 0; i < NumAttributes; i++)
+		{
+			if (!Writers.IsValidIndex(i) || !Writers[i])
+			{
+				continue;
+			}
+
+			const FAttributeIdentity& Identity = Identities[i];
+
+			PCGExMetaHelpers::ExecuteWithRightType(
+				Identity,
+				[&](auto DummyValue)
+				{
+					using T = decltype(DummyValue);
+					TBuffer<T>* Writer = static_cast<TBuffer<T>*>(Writers[i].Get());
+
+					if (Writer->GetUnderlyingDomain() != EDomainType::Elements)
+					{
+						// Single slot: the scope's last valid key wins, as it does when forwarding entry by entry.
+						Writer->SetValue(0, Identity.Attribute->GetValueFromItemKey<T>(ValidKeys.Last()));
+						return;
+					}
+
+					// Reads through the child attribute: an inherited entry resolves to the parent's value, one lock per attribute.
+					ValueKeys.Reset();
+					Identity.Attribute->GetValueKeys(TConstArrayView<PCGMetadataEntryKey>(ValidKeys), ValueKeys);
+
+					TArray<T> Values;
+					Values.SetNum(ValueKeys.Num());
+					Identity.Attribute->GetValues<T>(TConstArrayView<PCGMetadataValueKey>(ValueKeys), TArrayView<T>(Values));
+
+					T* Out = static_cast<TArrayBuffer<T>*>(Writer)->GetOutValues()->GetData();
+					for (int32 k = 0; k < TargetIndices.Num(); k++)
+					{
+						Out[TargetIndices[k]] = MoveTemp(Values[k]);
+					}
+				});
+		}
+	}
+
 	void FDataForwardHandler::Forward(const int32 SourceIndex, const TArray<int32>& Indices)
 	{
 		// Prepared-target variant (requires the target-facade constructor): fans one source row out to
@@ -244,6 +395,87 @@ namespace PCGExData
 					for (const int32 TargetIndex : Indices)
 					{
 						Writers[i]->SetVoid(TargetIndex, Scratch);
+					}
+				});
+		}
+	}
+
+	void FDataForwardHandler::ForwardScoped(const PCGExMT::FScope& Scope, const TConstArrayView<int32> SourceIndexPerTarget)
+	{
+		check(SourceIndexPerTarget.Num() >= Scope.End)
+
+		const int32 NumAttributes = Identities.Num();
+
+		for (int i = 0; i < NumAttributes; i++)
+		{
+			const FAttributeIdentity& Identity = Identities[i];
+			if (!Readers.IsValidIndex(i) || !Readers[i] || !Writers[i])
+			{
+				continue;
+			}
+
+			PCGExMetaHelpers::ExecuteWithRightType(
+				Identity,
+				[&](auto DummyValue)
+				{
+					using T = decltype(DummyValue);
+					TBuffer<T>* Reader = static_cast<TBuffer<T>*>(Readers[i].Get());
+					TBuffer<T>* Writer = static_cast<TBuffer<T>*>(Writers[i].Get());
+
+					if (Writer->GetUnderlyingDomain() != EDomainType::Elements)
+					{
+						// Single slot: the scope's last forwarded row wins, as it does when forwarding point by point.
+						for (int32 t = Scope.End - 1; t >= Scope.Start; t--)
+						{
+							const int32 Row = SourceIndexPerTarget[t];
+							if (Row >= 0)
+							{
+								Writer->SetValue(0, Reader->Read(Row));
+								break;
+							}
+						}
+						return;
+					}
+
+					T* Out = static_cast<TArrayBuffer<T>*>(Writer)->GetOutValues()->GetData();
+
+					// Raw array only for a fully read Elements reader; a sparse one is fetched per scope of another data.
+					if (Reader->GetUnderlyingDomain() == EDomainType::Elements && !Reader->IsSparse())
+					{
+						const T* In = static_cast<TArrayBuffer<T>*>(Reader)->GetInValues()->GetData();
+						for (int32 t = Scope.Start; t < Scope.End; t++)
+						{
+							const int32 Row = SourceIndexPerTarget[t];
+							if (Row >= 0)
+							{
+								Out[t] = In[Row];
+							}
+						}
+					}
+					else
+					{
+						for (int32 t = Scope.Start; t < Scope.End; t++)
+						{
+							const int32 Row = SourceIndexPerTarget[t];
+							if (Row >= 0)
+							{
+								Out[t] = Reader->Read(Row);
+							}
+						}
+					}
+				},
+				[&]()
+				{
+					PCGExTypes::FScopedTypedValue Scratch = Readers[i]->MakeScopedValue();
+					for (int32 t = Scope.Start; t < Scope.End; t++)
+					{
+						const int32 Row = SourceIndexPerTarget[t];
+						if (Row < 0)
+						{
+							continue;
+						}
+						Readers[i]->ReadVoid(Row, Scratch);
+						Writers[i]->SetVoid(t, Scratch);
 					}
 				});
 		}

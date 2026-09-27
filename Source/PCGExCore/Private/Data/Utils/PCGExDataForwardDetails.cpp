@@ -42,6 +42,15 @@ TSharedPtr<PCGExData::FDataForwardHandler> FPCGExForwardDetails::TryGetHandler(c
 	return bEnabled ? GetHandler(InSourceDataFacade, InTargetDataFacade, InDomain, InIgnoredAttributes) : nullptr;
 }
 
+TSharedPtr<PCGExData::FDataForwardHandler> FPCGExForwardDetails::TryGetHandler(const UPCGMetadata* InSourceMetadata, const TSharedPtr<PCGExData::FFacade>& InTargetDataFacade, const TSet<FName>* InIgnoredAttributes) const
+{
+	if (!bEnabled)
+	{
+		return nullptr;
+	}
+	return MakeShared<PCGExData::FDataForwardHandler>(*this, InSourceMetadata, InTargetDataFacade, InIgnoredAttributes);
+}
+
 bool FPCGExAttributeToTagDetails::Init(const FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InSourceFacade, const TSet<FName>* IgnoreAttributes)
 {
 	// Single-fetch on the facade's input is identical to the raw-data path (MakeBroadcaster just forwards
