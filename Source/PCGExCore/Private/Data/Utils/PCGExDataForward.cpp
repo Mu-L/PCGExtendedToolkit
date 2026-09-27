@@ -439,7 +439,8 @@ namespace PCGExData
 
 					T* Out = static_cast<TArrayBuffer<T>*>(Writer)->GetOutValues()->GetData();
 
-					if (Reader->GetUnderlyingDomain() == EDomainType::Elements)
+					// Raw array only for a fully read Elements reader; a sparse one is fetched per scope of another data.
+					if (Reader->GetUnderlyingDomain() == EDomainType::Elements && !Reader->IsSparse())
 					{
 						const T* In = static_cast<TArrayBuffer<T>*>(Reader)->GetInValues()->GetData();
 						for (int32 t = Scope.Start; t < Scope.End; t++)
