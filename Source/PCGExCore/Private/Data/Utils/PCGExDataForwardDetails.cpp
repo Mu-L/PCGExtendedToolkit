@@ -44,7 +44,11 @@ TSharedPtr<PCGExData::FDataForwardHandler> FPCGExForwardDetails::TryGetHandler(c
 
 TSharedPtr<PCGExData::FDataForwardHandler> FPCGExForwardDetails::TryGetHandler(const UPCGMetadata* InSourceMetadata, const TSharedPtr<PCGExData::FFacade>& InTargetDataFacade, const TSet<FName>* InIgnoredAttributes) const
 {
-	return bEnabled ? MakeShared<PCGExData::FDataForwardHandler>(*this, InSourceMetadata, InTargetDataFacade, InIgnoredAttributes) : nullptr;
+	if (!bEnabled)
+	{
+		return nullptr;
+	}
+	return MakeShared<PCGExData::FDataForwardHandler>(*this, InSourceMetadata, InTargetDataFacade, InIgnoredAttributes);
 }
 
 bool FPCGExAttributeToTagDetails::Init(const FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InSourceFacade, const TSet<FName>* IgnoreAttributes)

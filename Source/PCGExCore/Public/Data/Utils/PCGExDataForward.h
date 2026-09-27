@@ -71,6 +71,11 @@ namespace PCGExData
 		// attribute instead of per row; call once after the parallel loop, before the facade write.
 		void ForwardEntries(TConstArrayView<PCGMetadataEntryKey> SourceKeys);
 
+		// Scoped ForwardEntry: target t in Scope receives the value at SourceKeyPerTarget[t]; PCGInvalidEntryKey leaves
+		// that target untouched. One bulk key/value resolution per attribute per scope, raw arrays on the Elements domain.
+		// Touches no handler state, so concurrent scopes may call it on the same handler.
+		void ForwardEntriesScoped(const PCGExMT::FScope& Scope, TConstArrayView<PCGMetadataEntryKey> SourceKeyPerTarget) const;
+
 		// Prepared-target variant (requires the target-facade constructor): fans one source row out to many
 		// target indices through the pre-created writers -- no lazy buffer creation, safe from concurrent tasks.
 		void Forward(const int32 SourceIndex, const TArray<int32>& Indices);

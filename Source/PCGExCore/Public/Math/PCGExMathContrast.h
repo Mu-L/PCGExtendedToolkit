@@ -251,6 +251,11 @@ namespace PCGExMath::Contrast
 		{
 		case 0: // Power
 		{
+			// Same degenerate guard as ContrastPower.
+			if (Contrast <= SMALL_NUMBER)
+			{
+				break;
+			}
 			const double Exp = 1.0 / Contrast;
 			for (int32 i = 0; i < Count; ++i)
 			{
@@ -265,7 +270,12 @@ namespace PCGExMath::Contrast
 
 		case 1: // SCurve
 		{
+			// Same degenerate guards as ContrastSCurve.
 			const double TanhC = FMath::Tanh(Contrast);
+			if (Contrast <= SMALL_NUMBER || FMath::Abs(TanhC) < SMALL_NUMBER)
+			{
+				break;
+			}
 			const double InvTanhC = 1.0 / TanhC;
 			for (int32 i = 0; i < Count; ++i)
 			{
@@ -351,6 +361,11 @@ namespace PCGExMath::Contrast
 		{
 		case 0: // Power
 		{
+			// Same degenerate guard as ContrastPower.
+			if (Contrast <= SMALL_NUMBER)
+			{
+				break;
+			}
 			const double Exp = 1.0 / Contrast;
 			for (int32 i = 0; i < Count; ++i)
 			{
@@ -366,7 +381,12 @@ namespace PCGExMath::Contrast
 
 		case 1: // SCurve
 		{
+			// Same degenerate guards as ContrastSCurve.
 			const double TanhC = FMath::Tanh(Contrast);
+			if (Contrast <= SMALL_NUMBER || FMath::Abs(TanhC) < SMALL_NUMBER)
+			{
+				break;
+			}
 			const double InvTanhC = 1.0 / TanhC;
 			for (int32 i = 0; i < Count; ++i)
 			{

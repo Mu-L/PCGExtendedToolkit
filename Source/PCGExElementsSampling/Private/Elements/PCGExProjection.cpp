@@ -343,13 +343,17 @@ namespace PCGExProjection
 
 			ApplySampling.Apply(OutTransforms[Index], Projected.Transform, LookAt);
 		}
+
+		if (AttributesForward)
+		{
+			AttributesForward->ForwardEntriesScoped(Scope, SampledEntries);
+		}
 	}
 
 	void FProcessor::CompleteWork()
 	{
 		if (AttributesForward)
 		{
-			AttributesForward->ForwardEntries(SampledEntries);
 			SampledEntries.Empty();
 
 			// Values are in the writers now; release the scratch entries instead of holding them until the context ends.

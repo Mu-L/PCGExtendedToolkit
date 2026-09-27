@@ -267,23 +267,31 @@ namespace PCGExData
 	void FDataForwardHandler::ForwardEntries(TConstArrayView<PCGMetadataEntryKey> SourceKeys)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FDataForwardHandler::ForwardEntries);
+		ForwardEntriesScoped(PCGExMT::FScope(0, SourceKeys.Num()), SourceKeys);
+	}
+
+	void FDataForwardHandler::ForwardEntriesScoped(const PCGExMT::FScope& Scope, const TConstArrayView<PCGMetadataEntryKey> SourceKeyPerTarget) const
+	{
+		check(SourceKeyPerTarget.Num() >= Scope.End)
 
 		if (Identities.IsEmpty())
 		{
 			return;
 		}
 
+		// Compacted once per scope: every attribute resolves the same key set.
 		TArray<int32> TargetIndices;
 		TArray<PCGMetadataEntryKey> ValidKeys;
-		TargetIndices.Reserve(SourceKeys.Num());
-		ValidKeys.Reserve(SourceKeys.Num());
+		TargetIndices.Reserve(Scope.Count);
+		ValidKeys.Reserve(Scope.Count);
 
-		for (int32 i = 0; i < SourceKeys.Num(); i++)
+		for (int32 t = Scope.Start; t < Scope.End; t++)
 		{
-			if (SourceKeys[i] != PCGInvalidEntryKey)
+			const PCGMetadataEntryKey Key = SourceKeyPerTarget[t];
+			if (Key != PCGInvalidEntryKey)
 			{
-				TargetIndices.Add(i);
-				ValidKeys.Add(SourceKeys[i]);
+				TargetIndices.Add(t);
+				ValidKeys.Add(Key);
 			}
 		}
 
@@ -297,31 +305,39 @@ namespace PCGExData
 
 		for (int i = 0; i < NumAttributes; i++)
 		{
-			if (!Writers.IsValidIndex(i) || !Writers[i] || Writers[i]->GetUnderlyingDomain() != EDomainType::Elements)
+			if (!Writers.IsValidIndex(i) || !Writers[i])
 			{
 				continue;
 			}
 
 			const FAttributeIdentity& Identity = Identities[i];
 
-			// Resolves inherited entries through the parent chain in bulk.
-			ValueKeys.Reset();
-			Identity.Attribute->GetValueKeys(TConstArrayView<PCGMetadataEntryKey>(ValidKeys), ValueKeys);
-
 			PCGExMetaHelpers::ExecuteWithRightType(
 				Identity,
 				[&](auto DummyValue)
 				{
 					using T = decltype(DummyValue);
+					TBuffer<T>* Writer = static_cast<TBuffer<T>*>(Writers[i].Get());
+
+					if (Writer->GetUnderlyingDomain() != EDomainType::Elements)
+					{
+						// Single slot: the scope's last valid key wins, as it does when forwarding entry by entry.
+						Writer->SetValue(0, Identity.Attribute->GetValueFromItemKey<T>(ValidKeys.Last()));
+						return;
+					}
+
+					// Reads through the child attribute: an inherited entry resolves to the parent's value, one lock per attribute.
+					ValueKeys.Reset();
+					Identity.Attribute->GetValueKeys(TConstArrayView<PCGMetadataEntryKey>(ValidKeys), ValueKeys);
 
 					TArray<T> Values;
 					Values.SetNum(ValueKeys.Num());
 					Identity.Attribute->GetValues<T>(TConstArrayView<PCGMetadataValueKey>(ValueKeys), TArrayView<T>(Values));
 
-					TArray<T>& OutValues = *StaticCastSharedPtr<TArrayBuffer<T>>(Writers[i])->GetOutValues();
+					T* Out = static_cast<TArrayBuffer<T>*>(Writer)->GetOutValues()->GetData();
 					for (int32 k = 0; k < TargetIndices.Num(); k++)
 					{
-						OutValues[TargetIndices[k]] = Values[k];
+						Out[TargetIndices[k]] = MoveTemp(Values[k]);
 					}
 				});
 		}

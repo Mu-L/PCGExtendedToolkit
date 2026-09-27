@@ -128,9 +128,10 @@ namespace PCGExProjection
 		TArray<int8> ProjectionMask;
 		TSharedPtr<PCGExData::TBuffer<bool>> SuccessWriter;
 
-		/** Scratch metadata ProjectPoint writes into (context-managed, parented to the target) and the entry each point got. */
+		/** Scratch metadata ProjectPoint writes into (context-managed, parented to the target); entries accumulate until CompleteWork. */
 		UPCGMetadata* SampledMetadata = nullptr;
-		TArray<int64> SampledEntries;
+		/** Entry each point got, PCGInvalidEntryKey when filtered out or rejected; forwarded per scope at the end of ProcessPoints. */
+		TArray<PCGMetadataEntryKey> SampledEntries;
 		TSharedPtr<PCGExData::FDataForwardHandler> AttributesForward;
 
 		bool bPrune = false;
