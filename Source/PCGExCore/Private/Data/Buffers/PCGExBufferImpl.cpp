@@ -12,6 +12,7 @@
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExPointIO.h"
 #include "Helpers/PCGExArrayHelpers.h"
+#include "Helpers/PCGExMetaHelpers.h"
 #include "Helpers/PCGExMetaHelpersMacros.h"
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
 #include "Metadata/Accessors/PCGCustomAccessor.h"
@@ -434,9 +435,9 @@ namespace PCGExData
 		auto GrabExistingValues = [&]()
 		{
 			// Read-only keys: mutable ones flatten a parented Out, and a facade's writable buffers init concurrently.
-			TUniquePtr<FPCGAttributeAccessorKeysPointIndices> TempOutKeys = MakeUnique<FPCGAttributeAccessorKeysPointIndices>(static_cast<const UPCGBasePointData*>(Source->GetOut()));
+			const TSharedPtr<IPCGAttributeAccessorKeys> TempOutKeys = PCGExMetaHelpers::MakeConstKeys(Source->GetOut());
 			TArrayView<T> OutRange = MakeArrayView(OutValues->GetData(), OutValues->Num());
-			if (!OutAccessor->GetRange<T>(OutRange, 0, *TempOutKeys.Get()))
+			if (!TempOutKeys || !OutAccessor->GetRange<T>(OutRange, 0, *TempOutKeys.Get()))
 			{
 				// No fill: OutValues already holds the default it was initialized with.
 				ReportReadFailure(Source->GetOut());

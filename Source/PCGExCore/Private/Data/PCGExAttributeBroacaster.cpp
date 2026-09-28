@@ -225,14 +225,10 @@ namespace PCGExData
 		{
 			Keys = InKeys;
 		}
-		else if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData))
-		{
-			Keys = MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData);
-		}
 		else
 		{
-			// Non-point data (e.g. attribute sets): let the engine build keys that match the accessor for any
-			// selector (attribute / property / $Index).
+			// Same data and selector as the accessor, so the engine returns keys of the accessor's own family,
+			// for any data class and any selector (attribute / property / $Index).
 			const FPCGAttributePropertyInputSelector Resolved = InSelector.CopyAndFixLast(InData);
 			if (TUniquePtr<const IPCGAttributeAccessorKeys> EngineKeys = PCGAttributeAccessorHelpers::CreateConstKeys(InData, Resolved))
 			{
